@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>MID CHAT 💬</title>
+  <style>
+    body { margin: 0; font-family: 'Segoe UI', Arial, sans-serif; background: #ece5dd; display: flex; flex-direction: column; height: 100vh; }
+    header { background: #075e54; color: white; padding: 15px; text-align: center; font-weight: bold; font-size: 1.2rem; }
+    
+    #chat { flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
+
+    /* Message Styles */
+    .msg-wrapper { display: flex; width: 100%; flex-direction: column; }
+    .msg { 
+      padding: 10px; 
+      border-radius: 12px; 
+      max-width: 75%; 
+      box-shadow: 0 1px 2px rgba(0,0,0,0.1); 
+      position: relative; 
+      word-wrap: break-word;
+    }
+
+    /* Right Side (My Messages) */
+    .my-msg-wrapper { align-items: flex-end; }
+    .my-msg { background: #dcf8c6; align-self: flex-end; border-top-right-radius: 2px; }
+
+    /* Left Side (Friend Messages) */
+    .other-msg-wrapper { align-items: flex-start; }
+    .other-msg { background: white; align-self: flex-start; border-top-left-radius: 2px; }
+
+    .user-tag { font-size: 0.75rem; font-weight: bold; margin-bottom: 4px; }
+    .del-btn { background: none; border: none; color: #999; cursor: pointer; font-size: 12px; margin-left: 8px; }
+    
+    .input-bar { display: flex; gap: 8px; padding: 10px; background: #f0f0f0; border-top: 1px solid #ddd; }
+    input { flex: 1; padding: 12px; border-radius: 25px; border: 1px solid #ccc; outline: none; }
+    button#sendBtn { padding: 10px 22px; border-radius: 25px; border: none; background: #075e54; color: white; font-weight: bold; cursor: pointer; }
+    img, video { max-width: 100%; border-radius: 8px; margin-top: 5px; display: block; }
+  </style>
+</head>
+<body>
+
+  <header> MID CHAT</header>
+  <div id="chat">Loading messages...</div>
+
+  <div class="input-bar">
+    <input id="msg" type="text" placeholder="Type a message..." />
+    <button id="sendBtn">Send</button>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
+    import { 
+      getFirestore, collection, addDoc, onSnapshot, query, orderBy, deleteDoc, doc 
+    } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyB0-s8XibvoEYkxc51jNo89uEaDkvXxFWs",
+      authDomain: "chating-app-9a3ed.firebaseapp.com",
+      projectId: "chating-app-9a3ed",
+      storageBucket: "chating-app-9a3ed.appspot.com",
+      messagingSenderId: "976373899109",
+      appId: "1:976373899109:web:d4ce04a77ade5a1f7d4b8c"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    let myName = localStorage.getItem("chatUser") || prompt("Enter your name:") || "Guest";
+    localStorage.setItem("chatUser", myName);
+
+    function getUserColor(username) {
+      let hash = 0;
+      for (let i = 0; i < username.length; i++) hash = username.charCodeAt(i) + ((hash << 5) - hash);
+      const color = Math.floor(Math.abs(Math.sin(hash) * 16777215) % 16777215).toString(16);
+      return '#' + '000000'.substring(0, 6 - color.length) + color;
+    }
+
+    const input = document.getElementById("msg");
+    const chat = document.getElementById("chat");
+    const sendBtn = document.getElementById("sendBtn");
+
+    async function sendMsg() {
+      const text = input.value.trim();
+      if (!text) return;
+      await addDoc(collection(db, "messages"), { user: myName, text: text, time: Date.now() });
+      input.value = "";
+    }
+
+    sendBtn.onclick = sendMsg;
+    input.onkeypress = (e) => { if (e.key === "Enter") sendMsg(); };
+
+    window.delMsg = async (id) => {
+      if (confirm("Delete this message?")) await deleteDoc(doc(db, "messages", id));
+    };
+
+    const q = query(collection(db, "messages"), orderBy("time"));
+    onSnapshot(q, (snapshot) => {
+      chat.innerHTML = "";
+      snapshot.forEach(docSnap => {
+        const d = docSnap.data();
+        const id = docSnap.id;
+        const isMe = d.user === myName; // Check if I sent the message
+        
+        let content = d.text.match(/\.(jpg|jpeg|png|gif)$/i) ? `<img src="${d.text}">` : 
+                      d.text.match(/\.(mp4|webm)$/i) ? `<video controls src="${d.text}"></video>` : 
+                      `<div>${d.text}</div>`;
+
+        chat.innerHTML += `
+          <div class="msg-wrapper ${isMe ? 'my-msg-wrapper' : 'other-msg-wrapper'}">
+            <div class="msg ${isMe ? 'my-msg' : 'other-msg'}">
+              ${!isMe ? `<div class="user-tag" style="color: ${getUserColor(d.user)};">${d.user}</div>` : ''}
+              ${content}
+              <button class="del-btn" onclick="delMsg('${id}')">×</button>
+            </div>
+          </div>
+        `;
+      });
+      chat.scrollTop = chat.scrollHeight;
+    });
+  </script>
+</body>
+</html>
